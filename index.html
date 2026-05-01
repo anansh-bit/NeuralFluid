@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Fluid Overlays // 2056</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Exo+2:ital,wght@0,200;0,300;0,400;1,200&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root {
+  --void: #020409;
+  --panel: #07101e;
+  --panel2: #0a1628;
+  --cyan: #00e5ff;
+  --cyan-soft: rgba(0,229,255,0.18);
+  --cyan-glow: rgba(0,229,255,0.08);
+  --violet: #a259ff;
+  --violet-soft: rgba(162,89,255,0.18);
+  --green: #00ffb3;
+  --orange: #ff6b35;
+  --text: #8ba9c5;
+  --text-bright: #d4eaf8;
+  --border: rgba(0,229,255,0.12);
+  --border-v: rgba(162,89,255,0.15);
+}
+*{margin:0;padding:0;box-sizing:border-box;cursor:none;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--void);
+  color:var(--text);
+  font-family:'Share Tech Mono',monospace;
+  overflow-x:hidden;
+  line-height:1.8;
+}
+
+/* ─── CURSOR ─── */
+#cursor{
+  position:fixed;width:12px;height:12px;
+  background:var(--cyan);border-radius:50%;
+  pointer-events:none;z-index:9999;
+  transform:translate(-50%,-50%);
+  transition:transform 0.08s ease,width 0.2s,height 0.2s,opacity 0.2s;
+  mix-blend-mode:screen;
+  box-shadow:0 0 12px var(--cyan),0 0 30px rgba(0,229,255,0.4);
+}
+#cursor-ring{
+  position:fixed;width:36px;height:36px;
+  border:1px solid rgba(0,229,255,0.4);
+  border-radius:50%;pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);
+  transition:all 0.18s ease;
+}
+body:hover #cursor{opacity:1;}
+
+/* ─── NAV ─── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:18px 48px;
+  display:flex;justify-content:space-between;align-items:center;
+  background:linear-gradient(180deg,rgba(2,4,9,0.95) 0%,transparent 100%);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(2px);
+}
+.nav-logo{
+  font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;
+  color:var(--cyan);letter-spacing:4px;
+  text-shadow:0 0 20px rgba(0,229,255,0.6);
+}
+.nav-links{display:flex;gap:32px;list-style:none;}
+.nav-links a{
+  color:var(--text);text-decoration:none;font-size:11px;
+  letter-spacing:2px;text-transform:uppercase;
+  transition:color 0.3s;position:relative;
+}
+.nav-links a::after{
+  content:'';position:absolute;bottom:-3px;left:0;right:0;height:1px;
+  background:var(--cyan);transform:scaleX(0);transition:transform 0.3s;transform-origin:right;
+}
+.nav-links a:hover{color:var(--cyan);}
+.nav-links a:hover::after{transform:scaleX(1);transform-origin:left;}
+
+/* ─── HERO ─── */
+#hero{
+  position:relative;height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+#three-canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+}
+.hero-content{
+  position:relative;z-index:10;text-align:center;
+  pointer-events:none;
+}
+.hero-eyebrow{
+  font-size:11px;letter-spacing:8px;text-transform:uppercase;
+  color:var(--violet);margin-bottom:24px;
+  animation:fadeUp 1s 0.3s both;
+}
+.hero-title{
+  font-family:'Orbitron',sans-serif;
+  font-size:clamp(36px,6vw,88px);font-weight:900;
+  line-height:1;letter-spacing:-1px;
+  color:transparent;
+  background:linear-gradient(135deg,var(--cyan) 0%,#fff 40%,var(--violet) 100%);
+  -webkit-background-clip:text;background-clip:text;
+  animation:fadeUp 1s 0.5s both;
+  filter:drop-shadow(0 0 40px rgba(0,229,255,0.3));
+}
+.hero-sub{
+  margin-top:20px;font-size:13px;letter-spacing:4px;
+  color:var(--text);animation:fadeUp 1s 0.7s both;
+}
+.hero-divider{
+  width:80px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  margin:28px auto;animation:fadeUp 1s 0.9s both;
+}
+.hero-desc{
+  max-width:480px;margin:0 auto;font-size:13px;
+  color:var(--text);opacity:0.8;font-family:'Exo 2',sans-serif;
+  font-style:italic;font-weight:200;
+  animation:fadeUp 1s 1.1s both;line-height:2;
+}
+.scroll-hint{
+  position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-size:10px;letter-spacing:3px;color:var(--text);opacity:0.5;
+  animation:fadeIn 1s 2s both;
+}
+.scroll-drip{
+  width:1px;height:40px;
+  background:linear-gradient(180deg,var(--cyan),transparent);
+  animation:drip 2s ease-in-out infinite;
+}
+@keyframes drip{
+  0%,100%{transform:scaleY(0.5);opacity:0.3;transform-origin:top;}
+  50%{transform:scaleY(1);opacity:0.8;transform-origin:top;}
+}
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(30px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@keyframes fadeIn{from{opacity:0;}to{opacity:0.5;}}
+
+/* ─── SECTIONS ─── */
+section{
+  padding:120px 48px;
+  max-width:1300px;margin:0 auto;
+}
+.full-bleed{
+  max-width:100%;padding:120px 0;
+  background:linear-gradient(180deg,var(--void) 0%,#040b18 50%,var(--void) 100%);
+}
+.full-bleed > .inner{padding:0 48px;max-width:1300px;margin:0 auto;}
+
+.section-tag{
+  font-size:10px;letter-spacing:6px;text-transform:uppercase;
+  color:var(--violet);margin-bottom:14px;
+  opacity:0;transition:opacity 0.6s;
+}
+.section-tag.visible{opacity:1;}
+.section-heading{
+  font-family:'Orbitron',sans-serif;
+  font-size:clamp(22px,3vw,42px);font-weight:700;
+  color:var(--text-bright);line-height:1.2;
+  margin-bottom:40px;
+  opacity:0;transform:translateY(20px);transition:all 0.7s 0.1s;
+}
+.section-heading .accent{color:var(--cyan);}
+.section-heading.visible{opacity:1;transform:translateY(0);}
+
+/* ─── FLUID CARD ─── */
+.fluid-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-top:2px solid var(--cyan);
+  padding:40px;
+  position:relative;overflow:hidden;
+  opacity:0;transform:translateY(30px);
+  transition:all 0.7s;
+}
+.fluid-card.visible{opacity:1;transform:translateY(0);}
+.fluid-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:shimmer 3s ease-in-out infinite;
+}
+.fluid-card-v{
+  border-top-color:var(--violet);
+}
+.fluid-card-v::before{
+  background:linear-gradient(90deg,transparent,var(--violet),transparent);
+}
+@keyframes shimmer{
+  0%,100%{opacity:0.4;background-position:-100% 0;}
+  50%{opacity:1;}
+}
+
+/* ─── CONTEXT GRID ─── */
+.context-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:24px;
+}
+
+/* ─── COMPARISON TABLE ─── */
+.compare-table{
+  width:100%;border-collapse:collapse;
+  opacity:0;transform:translateY(20px);transition:all 0.8s 0.2s;
+}
+.compare-table.visible{opacity:1;transform:translateY(0);}
+.compare-table th{
+  font-family:'Orbitron',sans-serif;font-size:11px;
+  letter-spacing:3px;text-transform:uppercase;
+  padding:20px 24px;text-align:left;
+  border-bottom:1px solid var(--border);
+}
+.compare-table th:nth-child(2){color:var(--text);background:rgba(255,255,255,0.02);}
+.compare-table th:nth-child(3){color:var(--cyan);background:var(--cyan-soft);}
+.compare-table td{
+  padding:18px 24px;font-size:12px;line-height:1.6;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  vertical-align:top;
+}
+.compare-table td:first-child{
+  color:var(--text);font-size:10px;letter-spacing:2px;
+  text-transform:uppercase;opacity:0.7;
+  font-weight:600;
+}
+.compare-table td:nth-child(2){
+  color:var(--text);background:rgba(255,255,255,0.01);
+}
+.compare-table td:nth-child(3){
+  color:var(--cyan);background:var(--cyan-glow);
+}
+.compare-table tr:hover td{background:rgba(0,229,255,0.04);}
+
+/* ─── ARCHITECTURE GRID ─── */
+.arch-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+.arch-item{
+  background:var(--panel);
+  border:1px solid var(--border);
+  padding:32px;position:relative;overflow:hidden;
+  opacity:0;transform:translateX(-20px);
+  transition:all 0.6s;
+}
+.arch-item.visible{opacity:1;transform:translateX(0);}
+.arch-item::after{
+  content:'';position:absolute;top:0;left:0;
+  width:3px;height:100%;
+  background:linear-gradient(180deg,var(--cyan),var(--violet));
+}
+.arch-item:nth-child(2){transition-delay:0.1s;}
+.arch-item:nth-child(3){transition-delay:0.2s;}
+.arch-item:nth-child(4){transition-delay:0.3s;}
+.arch-label{
+  font-family:'Orbitron',sans-serif;font-size:11px;
+  color:var(--cyan);letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:12px;
+}
+.arch-title{
+  font-family:'Orbitron',sans-serif;font-size:16px;
+  color:var(--text-bright);margin-bottom:16px;font-weight:600;
+}
+.arch-item p{font-size:12px;line-height:1.9;color:var(--text);}
+
+/* ─── FLUID VISUAL ─── */
+.fluid-visual-wrap{
+  position:relative;height:320px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  overflow:hidden;margin-bottom:24px;
+}
+#fluid-canvas{width:100%;height:100%;}
+
+/* ─── CODE BLOCK ─── */
+.code-wrap{
+  background:#020d1a;
+  border:1px solid rgba(0,229,255,0.2);
+  border-left:3px solid var(--cyan);
+  padding:32px 36px;font-size:12px;
+  font-family:'Share Tech Mono',monospace;
+  line-height:2;position:relative;
+  opacity:0;transition:all 0.7s 0.3s;
+}
+.code-wrap.visible{opacity:1;}
+.code-wrap .comment{color:rgba(0,229,255,0.45);}
+.code-wrap .keyword{color:var(--violet);}
+.code-wrap .fn{color:#f0c678;}
+.code-wrap .str{color:var(--green);}
+.code-wrap .num{color:var(--orange);}
+.code-wrap::before{
+  content:'// VISCOSITY LOGIC';
+  position:absolute;top:-1px;left:32px;
+  background:#020d1a;padding:0 12px;
+  font-size:9px;letter-spacing:4px;color:var(--violet);
+  border:1px solid var(--border-v);border-top:none;
+}
+
+/* ─── RESPONSE CARDS ─── */
+.response-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
+}
+.resp-card{
+  background:var(--panel);border:1px solid var(--border-v);
+  padding:32px;position:relative;overflow:hidden;
+  opacity:0;transform:translateY(30px);
+  transition:all 0.6s;
+}
+.resp-card.visible{opacity:1;transform:translateY(0);}
+.resp-card:nth-child(2){transition-delay:0.15s;}
+.resp-card:nth-child(3){transition-delay:0.3s;}
+.resp-num{
+  font-family:'Orbitron',sans-serif;font-size:48px;
+  font-weight:900;color:var(--border-v);
+  position:absolute;top:16px;right:20px;
+  line-height:1;
+}
+.resp-icon{font-size:28px;margin-bottom:16px;}
+.resp-title{
+  font-family:'Orbitron',sans-serif;font-size:13px;
+  color:var(--violet);letter-spacing:2px;
+  text-transform:uppercase;margin-bottom:12px;
+}
+.resp-card p{font-size:11px;line-height:2;color:var(--text);}
+.state-bar{
+  margin-top:20px;height:3px;
+  background:rgba(162,89,255,0.15);
+  border-radius:2px;overflow:hidden;
+}
+.state-fill{
+  height:100%;width:0;
+  background:linear-gradient(90deg,var(--violet),var(--cyan));
+  border-radius:2px;transition:width 1.5s 0.5s ease;
+}
+.resp-card.visible .state-fill{width:var(--fill,70%);}
+
+/* ─── FRICTION SECTION ─── */
+.friction-section{
+  background:linear-gradient(180deg,var(--void) 0%,#0a0510 100%);
+}
+.friction-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
+}
+.friction-card{
+  border:1px solid rgba(255,107,53,0.2);
+  background:rgba(10,5,20,0.8);
+  padding:36px;position:relative;overflow:hidden;
+  opacity:0;transform:translateY(20px);transition:all 0.7s;
+}
+.friction-card.visible{opacity:1;transform:translateY(0);}
+.friction-card:nth-child(2){transition-delay:0.15s;}
+.friction-card:nth-child(3){transition-delay:0.3s;}
+.friction-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--orange),transparent);
+}
+.friction-label{
+  font-family:'Orbitron',sans-serif;font-size:10px;
+  color:var(--orange);letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:10px;
+}
+.friction-title{
+  font-family:'Orbitron',sans-serif;font-size:16px;
+  color:var(--text-bright);margin-bottom:14px;font-weight:600;
+}
+.friction-card p{font-size:12px;line-height:2;color:var(--text);}
+.glitch{
+  position:relative;display:inline-block;
+  animation:glitch-anim 4s infinite;
+}
+@keyframes glitch-anim{
+  0%,90%,100%{clip-path:none;transform:none;}
+  91%{clip-path:polygon(0 30%,100% 30%,100% 50%,0 50%);transform:translate(-3px,0);}
+  92%{clip-path:polygon(0 60%,100% 60%,100% 75%,0 75%);transform:translate(3px,0);}
+  93%{clip-path:none;transform:none;}
+  94%{clip-path:polygon(0 10%,100% 10%,100% 25%,0 25%);transform:translate(-2px,0);}
+  95%{clip-path:none;transform:none;}
+}
+
+/* ─── DIVIDER ─── */
+.divider{
+  width:100%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent);
+  opacity:0.2;margin:0;
+}
+
+/* ─── TWO-COL ─── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;}
+.two-col p{font-size:13px;line-height:2;color:var(--text);margin-bottom:16px;}
+.two-col .accent-text{color:var(--cyan);}
+
+/* ─── DIEGETIC ARTIFACTS ─── */
+.artifact-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;}
+.artifact{
+  background:rgba(0,255,179,0.04);
+  border:1px solid rgba(0,255,179,0.15);
+  padding:28px;position:relative;
+}
+.artifact-name{
+  font-family:'Orbitron',sans-serif;font-size:12px;
+  color:var(--green);letter-spacing:2px;
+  text-transform:uppercase;margin-bottom:10px;
+}
+.artifact p{font-size:12px;line-height:2;color:var(--text);}
+
+/* ─── FOOTER ─── */
+footer{
+  border-top:1px solid var(--border);
+  padding:48px;display:flex;
+  justify-content:space-between;align-items:center;
+  font-size:11px;letter-spacing:2px;color:rgba(139,169,197,0.4);
+}
+.foot-logo{
+  font-family:'Orbitron',sans-serif;font-size:12px;
+  color:var(--cyan);opacity:0.5;
+}
+
+/* ─── AURA PILL ─── */
+.aura-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--cyan-soft);
+  border:1px solid rgba(0,229,255,0.25);
+  padding:6px 14px;font-size:10px;
+  letter-spacing:2px;color:var(--cyan);
+  text-transform:uppercase;margin:4px;
+}
+.aura-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--cyan);
+  animation:pulse 2s ease-in-out infinite;
+}
+.aura-dot.v{background:var(--violet);}
+@keyframes pulse{
+  0%,100%{opacity:0.4;transform:scale(0.8);}
+  50%{opacity:1;transform:scale(1.2);}
+}
+
+/* ─── VISCOSITY BAR ─── */
+.visc-demo{
+  margin-top:28px;display:flex;flex-direction:column;gap:12px;
+}
+.visc-row{display:flex;align-items:center;gap:16px;}
+.visc-label{width:200px;font-size:11px;letter-spacing:1px;color:var(--text);opacity:0.7;}
+.visc-bar-wrap{flex:1;height:12px;background:rgba(255,255,255,0.05);border-radius:6px;overflow:hidden;}
+.visc-bar{height:100%;border-radius:6px;width:0;transition:width 1.5s ease;}
+.visc-state{font-size:10px;letter-spacing:2px;width:180px;text-align:right;opacity:0.7;}
+
+/* ─── FLOAT ANIMATION ─── */
+@keyframes float{
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-10px);}
+}
+
+/* ─── HERO PARTICLE CANVAS ─── */
+#particle-overlay{
+  position:absolute;inset:0;pointer-events:none;z-index:1;
+}
+
+/* stat bars wide layout */
+@media(max-width:1000px){
+  .context-grid,.arch-grid,.response-grid,.friction-grid{grid-template-columns:1fr;}
+  .two-col,.artifact-grid{grid-template-columns:1fr;}
+  nav{padding:14px 24px;}
+  section{padding:80px 24px;}
+  .compare-table th,.compare-table td{padding:14px 12px;font-size:11px;}
+}
+</style>
+</head>
+<body>
+
+<!-- CUSTOM CURSOR -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- NAVIGATION -->
+<nav>
+  <div class="nav-logo">NFO // 2056</div>
+  <ul class="nav-links">
+    <li><a href="#context">Context</a></li>
+    <li><a href="#speculation">Speculation</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#interaction">Interaction</a></li>
+    <li><a href="#responsiveness">Response</a></li>
+    <li><a href="#friction">Friction</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero" style="max-width:100%;padding:0;">
+  <canvas id="three-canvas"></canvas>
+  <canvas id="particle-overlay"></canvas>
+  <div class="hero-content">
+    <div class="hero-eyebrow">Speculative Design Submission</div>
+    <h1 class="hero-title">NEURAL<br>FLUID<br>OVERLAYS</h1>
+    <div class="hero-divider"></div>
+    <div class="hero-sub">2056 // XR EVOLVED // DIRECT CORTEX RENDERING</div>
+    <p class="hero-desc" style="margin-top:20px;">
+      The interface is no longer a screen.<br>
+      It is a synthetic liquid injected into consciousness.
+    </p>
+  </div>
+  <div class="scroll-hint">
+    <div class="scroll-drip"></div>
+    <span>SCROLL</span>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 1: CONTEXT -->
+<section id="context">
+  <div class="section-tag reveal-tag">01 // PROJECT CONTEXT</div>
+  <h2 class="section-heading reveal-heading">The <span class="accent">End</span> of the Screen</h2>
+
+  <div class="context-grid">
+    <div class="fluid-card reveal-card">
+      <div style="font-family:'Orbitron',sans-serif;font-size:12px;color:var(--cyan);letter-spacing:3px;margin-bottom:16px;text-transform:uppercase;">Vision</div>
+      <p style="font-size:13px;line-height:2;">
+        This speculative design project explores Extended Reality thirty years into the future. AR glasses have been rendered obsolete by <span style="color:var(--cyan)">Direct Neural Overlays</span> — digital information injected directly into the visual and somatosensory cortices via neural dust and brain-computer interfaces.
+      </p>
+      <br>
+      <div style="display:flex;flex-wrap:wrap;gap:0;">
+        <span class="aura-pill"><span class="aura-dot"></span>Neural Dust BCIs</span>
+        <span class="aura-pill"><span class="aura-dot"></span>Visual Cortex Injection</span>
+        <span class="aura-pill"><span class="aura-dot v" style="background:var(--violet);"></span>Somatosensory Layer</span>
+      </div>
+    </div>
+    <div class="fluid-card fluid-card-v reveal-card" style="transition-delay:0.15s;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:12px;color:var(--violet);letter-spacing:3px;margin-bottom:16px;text-transform:uppercase;">Paradigm Shift</div>
+      <p style="font-size:13px;line-height:2;">
+        By removing the physical screen, the concept of "User Interface" is fundamentally dismantled. UI is no longer a 2D bounding box overlaid onto the world — it is a <span style="color:var(--violet)">volumetric, responsive fluid</span> that obeys the laws of synthetic physics.
+      </p>
+      <br>
+      <p style="font-size:13px;line-height:2;font-family:'Exo 2',sans-serif;font-style:italic;font-weight:200;color:var(--text);opacity:0.8;">
+        "Neuro-Morphic Fluidity — where the mind is the display, and reality is the canvas."
+      </p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 2: CORE SPECULATION -->
+<section id="speculation">
+  <div class="section-tag reveal-tag">02 // CORE SPECULATION</div>
+  <h2 class="section-heading reveal-heading">The <span class="accent">Skin</span> Economy</h2>
+
+  <div class="two-col" style="margin-bottom:60px;">
+    <div>
+      <p class="reveal-p">Physical manufacturing has become prohibitively expensive and environmentally taxing. Society has embraced <span class="accent-text">"Generic Minimalism"</span> — most physical objects are 3D-printed using cheap, matte-grey, sustainable matter.</p>
+      <p class="reveal-p">The Neural Overlay acts as an architectural <span class="accent-text">"skin,"</span> painting blank canvases in real-time. A simple block chair can visually appear as rich mahogany, with its texture physically felt via haptic synesthesia.</p>
+    </div>
+    <div>
+      <div class="fluid-card reveal-card" style="animation:float 6s ease-in-out infinite;height:100%;display:flex;flex-direction:column;justify-content:center;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:10px;color:var(--text);letter-spacing:3px;margin-bottom:20px;opacity:0.5;">MATERIAL REALITY // 2056</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div style="background:rgba(255,255,255,0.03);padding:20px;border:1px solid rgba(255,255,255,0.06);text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">▣</div>
+            <div style="font-size:10px;color:var(--text);opacity:0.5;letter-spacing:2px;">PHYSICAL<br>OBJECT</div>
+            <div style="font-size:10px;color:var(--text);margin-top:6px;">Grey Matter</div>
+          </div>
+          <div style="background:var(--cyan-glow);padding:20px;border:1px solid rgba(0,229,255,0.2);text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;filter:drop-shadow(0 0 8px var(--cyan));">◈</div>
+            <div style="font-size:10px;color:var(--cyan);letter-spacing:2px;">NEURAL<br>SKIN</div>
+            <div style="font-size:10px;color:var(--cyan);margin-top:6px;">Any Material</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;font-size:11px;color:var(--text);opacity:0.6;text-align:center;line-height:2;">
+          Physical form + Neural skin =<br><span style="color:var(--cyan);">Infinite material expression</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON TABLE -->
+  <div class="section-tag reveal-tag" style="margin-bottom:20px;">UI PARADIGM COMPARISON</div>
+  <table class="compare-table reveal-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>2026 // Optical AR</th>
+        <th>2056 // Neural Fluid Overlay</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Form Factor</td>
+        <td>Wearable glass lenses, headsets</td>
+        <td>Invisible, systemic neural interface</td>
+      </tr>
+      <tr>
+        <td>Environment</td>
+        <td>Screens projected onto real objects</td>
+        <td>"Blank Canvas" physical world skinned by UI</td>
+      </tr>
+      <tr>
+        <td>UI Geometry</td>
+        <td>Bounded rectangles, floating panels</td>
+        <td>Fluid, amoebic, non-Euclidean volumes</td>
+      </tr>
+      <tr>
+        <td>Interaction</td>
+        <td>Air-pinching, eye-tracking, voice</td>
+        <td>Intent-based proprioception, cognitive load</td>
+      </tr>
+      <tr>
+        <td>Sensory Output</td>
+        <td>Visual and localized audio</td>
+        <td>Haptic synesthesia — feeling digital textures</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 3: ARCHITECTURE -->
+<section id="architecture">
+  <div class="section-tag reveal-tag">03 // UI ARCHITECTURE</div>
+  <h2 class="section-heading reveal-heading">Fluid Containers &amp;<br><span class="accent">Spatial Infographics</span></h2>
+
+  <!-- Fluid canvas visual -->
+  <div class="fluid-visual-wrap reveal-card" style="margin-bottom:40px;">
+    <canvas id="fluid-canvas"></canvas>
+  </div>
+
+  <div class="arch-grid">
+    <div class="arch-item reveal-arch">
+      <div class="arch-label">01</div>
+      <div class="arch-title">Environmental Adherence</div>
+      <p>The UI possesses "Smart Viscosity." If summoned near a flat surface like a desk, the UI <span style="color:var(--cyan)">pours</span> onto it, filling the space like water. It actively flows around physical objects to maintain a dry buffer zone.</p>
+    </div>
+    <div class="arch-item reveal-arch" style="transition-delay:0.1s;">
+      <div class="arch-label">02</div>
+      <div class="arch-title">Spatial Infographics &amp; Aura Data</div>
+      <p>Information exists as fluid <span style="color:var(--cyan)">auras</span> surrounding objects and people. A coffee cup has its temperature and caffeine content swirling around its rim. A person's profile manifests as a translucent liquid ring orbiting their shoulders.</p>
+    </div>
+    <div class="arch-item reveal-arch" style="transition-delay:0.2s;">
+      <div class="arch-label">03</div>
+      <div class="arch-title">Surface Tension &amp; Coalescence</div>
+      <p>To minimize an application, the user <span style="color:var(--cyan)">pinches</span> the fluid puddle. Its surface tension increases until it condenses into a high-density, marble-like "bead" of data that orbits the user's peripheral vision.</p>
+    </div>
+    <div class="arch-item reveal-arch" style="transition-delay:0.3s;">
+      <div class="arch-label">04</div>
+      <div class="arch-title">Non-Euclidean Volumes</div>
+      <p>A digital folder manifests as a floating <span style="color:var(--cyan)">sphere of liquid mercury</span>. When the user reaches into it, their hand submerges, and the interior volume expands infinitely, revealing a 3D spatial gallery of assets.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 4: INTERACTION -->
+<section id="interaction">
+  <div class="section-tag reveal-tag">04 // INTERACTION STUDY</div>
+  <h2 class="section-heading reveal-heading">Haptic <span class="accent">Synesthesia</span></h2>
+
+  <div class="two-col" style="margin-bottom:40px;">
+    <div>
+      <p class="reveal-p"><span style="color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;">Phantom Limb Interaction</span><br>The neural overlay tricks the brain into feeling physical resistance when interacting with digital fluid. Secure documents feel highly viscous and heavy — like honey. Transient notifications feel light and misty.</p>
+      <br>
+      <p class="reveal-p"><span style="color:var(--violet);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;">Synesthetic Commands</span><br>Users can map mental commands to simulated sensory experiences. Mentally "cooling" a fluid container archives its contents, while "heating" causes the UI to expand and open.</p>
+      <br>
+      <p class="reveal-p"><span style="color:var(--green);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;">Pourable Interfaces</span><br>Sharing data does not involve "sending" a file. A user physically pushes their digital fluid puddle across a table toward a colleague. When the puddles touch, they coalesce into a unified shared workspace.</p>
+    </div>
+    <div>
+      <div class="code-wrap reveal-code">
+        <span class="comment">// Concept Logic: Synesthetic Viscosity Response</span><br><br>
+        <span class="keyword">function</span> <span class="fn">calculateFluidViscosity</span>(<br>
+        &nbsp;&nbsp;dataPriority,<br>
+        &nbsp;&nbsp;userCognitiveLoad<br>
+        ) {<br>
+        &nbsp;&nbsp;<span class="keyword">if</span> (dataPriority === <span class="str">'URGENT'</span>) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// Fast, demands attention</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="str">'LOW_VISCOSITY_SPLASH'</span>;<br>
+        &nbsp;&nbsp;} <span class="keyword">else if</span> (dataPriority === <span class="str">'ARCHIVE'</span>) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// Slow, requires effort to manipulate</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="str">'HIGH_VISCOSITY_HONEY'</span>;<br>
+        &nbsp;&nbsp;}<br><br>
+        &nbsp;&nbsp;<span class="comment">// UI evaporates if user is overwhelmed</span><br>
+        &nbsp;&nbsp;<span class="keyword">if</span> (userCognitiveLoad &gt; <span class="num">THRESHOLD_OVERWHELM</span>) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="str">'STATE_VAPORIZE'</span>;<br>
+        &nbsp;&nbsp;}<br>
+        }
+      </div>
+
+      <!-- Viscosity demo bars -->
+      <div class="visc-demo reveal-card" style="margin-top:0;background:var(--panel);border:1px solid var(--border);padding:24px;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--cyan);margin-bottom:16px;">VISCOSITY SPECTRUM</div>
+        <div class="visc-row">
+          <div class="visc-label">URGENT // SPLASH</div>
+          <div class="visc-bar-wrap"><div class="visc-bar" style="--w:15%;background:linear-gradient(90deg,var(--orange),#ff3333);width:var(--w,0)"></div></div>
+          <div class="visc-state" style="color:var(--orange);">0.15 Pa·s</div>
+        </div>
+        <div class="visc-row">
+          <div class="visc-label">STANDARD // WATER</div>
+          <div class="visc-bar-wrap"><div class="visc-bar" style="--w:35%;background:linear-gradient(90deg,var(--cyan),#0080aa);"></div></div>
+          <div class="visc-state" style="color:var(--cyan);">0.35 Pa·s</div>
+        </div>
+        <div class="visc-row">
+          <div class="visc-label">ARCHIVE // HONEY</div>
+          <div class="visc-bar-wrap"><div class="visc-bar" style="--w:85%;background:linear-gradient(90deg,var(--violet),#6600cc);"></div></div>
+          <div class="visc-state" style="color:var(--violet);">0.85 Pa·s</div>
+        </div>
+        <div class="visc-row">
+          <div class="visc-label">OVERWHELMED // VAPORIZE</div>
+          <div class="visc-bar-wrap"><div class="visc-bar" style="--w:5%;background:linear-gradient(90deg,rgba(255,255,255,0.3),transparent);"></div></div>
+          <div class="visc-state" style="color:rgba(255,255,255,0.3);">→ 0.00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 5: RESPONSIVENESS -->
+<section id="responsiveness">
+  <div class="section-tag reveal-tag">05 // SYSTEM RESPONSIVENESS</div>
+  <h2 class="section-heading reveal-heading">Bio-Adaptive <span class="accent">Latency</span> &amp;<br>Reality Filtering</h2>
+
+  <div class="response-grid">
+    <div class="resp-card reveal-resp">
+      <div class="resp-num">01</div>
+      <div class="resp-icon">⬡</div>
+      <div class="resp-title">Cognitive Filter Bubbles</div>
+      <p>The system acts as a real-time reality editor. Users apply "fluid masking" — unwanted individuals or chaotic crowds are visually softened into abstract, pixelated clouds or gentle water ripples. Two people in the same room may perceive entirely different environments.</p>
+      <div class="state-bar"><div class="state-fill" style="--fill:88%;"></div></div>
+    </div>
+    <div class="resp-card reveal-resp">
+      <div class="resp-num">02</div>
+      <div class="resp-icon">◉</div>
+      <div class="resp-title">Emotional Refraction</div>
+      <p>The UI's visual and physical properties adapt to the user's cortisol levels and heart rate. High stress results in a jagged, high-contrast "splashing" interface. A calm state produces a smooth, glassy pool with slow, rhythmic ripples.</p>
+      <div class="state-bar"><div class="state-fill" style="--fill:64%;"></div></div>
+    </div>
+    <div class="resp-card reveal-resp">
+      <div class="resp-num">03</div>
+      <div class="resp-icon">◎</div>
+      <div class="resp-title">Gaze-Contingent Solidification</div>
+      <p>To conserve cognitive bandwidth, peripheral UI elements remain in a blurred, "unformed" liquid state. The moment the user's gaze darts toward them, they instantly snap into high-fidelity solid forms.</p>
+      <div class="state-bar"><div class="state-fill" style="--fill:72%;"></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 6: FRICTION -->
+<section id="friction" style="padding-bottom:60px;">
+  <div class="section-tag reveal-tag" style="color:var(--orange);">06 // SPECULATIVE FRICTION</div>
+  <h2 class="section-heading reveal-heading"><span class="glitch">Cognitive Bleed</span> &amp;<br>Digital <span style="color:var(--orange);">Residue</span></h2>
+
+  <p style="font-size:13px;line-height:2;max-width:700px;margin-bottom:40px;font-family:'Exo 2',sans-serif;font-weight:200;font-style:italic;color:var(--text);opacity:0.8;">
+    A core requirement of speculative design is exploring unintended consequences. In 2056, the primary frictions are psychological and environmental — the blurring of digital physics with physical reality.
+  </p>
+
+  <div class="friction-grid">
+    <div class="friction-card reveal-friction">
+      <div class="friction-label">6.1</div>
+      <div class="friction-title">The Glitch-Ghetto &amp; Digital Residue</div>
+      <p>If physical architecture is just a blank canvas, what happens when the overlay degrades? "Digital Residue" occurs when fluid UI leaves visual or haptic stains on physical surfaces — shimmering, viscous burn-ins that remain long after an app is closed.</p>
+    </div>
+    <div class="friction-card reveal-friction">
+      <div class="friction-label">6.2</div>
+      <div class="friction-title">Cognitive Bleed</div>
+      <p>When users spend a majority of their day within a Neural Fluid Overlay, the brain loses its ability to distinguish between synthetic fluid physics and real-world solid mechanics. A user might instinctively "swipe" a physical book to scroll its pages.</p>
+    </div>
+    <div class="friction-card reveal-friction">
+      <div class="friction-label">6.3</div>
+      <div class="friction-title">Diegetic Artifacts</div>
+      <p>Society has introduced physical grounding tools to combat cognitive drift — a raw sandstone Sensory Calibration Stone with zero digital connectivity, and a Reality Eraser brush to scrub away stubborn UI stains from generic furniture.</p>
+    </div>
+  </div>
+
+  <div class="artifact-grid" style="margin-top:32px;">
+    <div class="artifact reveal-card" style="border-color:rgba(0,255,179,0.15);background:rgba(0,255,179,0.03);">
+      <div class="artifact-name">The Sensory Calibration Stone</div>
+      <p>A physical, low-tech artifact made of raw, jagged sandstone. Zero digital connectivity. When experiencing Cognitive Bleed, users rub the stone — the intense, unyielding physical texture forcibly re-anchors the brain to the rigid laws of physical matter.</p>
+    </div>
+    <div class="artifact reveal-card" style="border-color:rgba(0,255,179,0.15);background:rgba(0,255,179,0.03);transition-delay:0.15s;">
+      <div class="artifact-name">The Reality Eraser</div>
+      <p>A purely physical haptic brush used to scrub away stubborn "Digital Residue" and UI stains from generic furniture, acting as a janitorial tool for the neural overlay environment.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-logo">NEURAL FLUID OVERLAYS // 2056</div>
+  <div>Speculative Design Submission &nbsp;·&nbsp; XR Futures Studio</div>
+  <div>BCI · NFO · NEURO-MORPHIC FLUIDITY</div>
+</footer>
+
+<script>
+// ─── CURSOR ───
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX; my=e.clientY;
+  cursor.style.left=mx+'px';
+  cursor.style.top=my+'px';
+});
+function animRing(){
+  rx+=(mx-rx)*0.12;
+  ry+=(my-ry)*0.12;
+  ring.style.left=rx+'px';
+  ring.style.top=ry+'px';
+  requestAnimationFrame(animRing);
+}
+animRing();
+
+document.querySelectorAll('a,button').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{
+    cursor.style.width='20px';cursor.style.height='20px';
+    ring.style.width='50px';ring.style.height='50px';
+    ring.style.borderColor='rgba(0,229,255,0.7)';
+  });
+  el.addEventListener('mouseleave',()=>{
+    cursor.style.width='12px';cursor.style.height='12px';
+    ring.style.width='36px';ring.style.height='36px';
+    ring.style.borderColor='rgba(0,229,255,0.4)';
+  });
+});
+
+// ─── THREE.JS HERO ───
+(function(){
+  const canvas = document.getElementById('three-canvas');
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W; canvas.height = H;
+
+  const renderer = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(W,H);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 100);
+  camera.position.z = 5;
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x0a1a2a, 2));
+  const cL = new THREE.PointLight(0x00e5ff, 4, 12);
+  cL.position.set(3,3,3);scene.add(cL);
+  const vL = new THREE.PointLight(0x9c27ff, 4, 12);
+  vL.position.set(-3,-2,2);scene.add(vL);
+  const gL = new THREE.PointLight(0x00ffb3, 2, 8);
+  gL.position.set(0,4,-2);scene.add(gL);
+
+  // Main blob geometry
+  const geo = new THREE.IcosahedronGeometry(1.6, 7);
+  const basePts = new Float32Array(geo.attributes.position.array);
+
+  // Inner blob
+  const mat = new THREE.MeshPhongMaterial({
+    color:0x001833, emissive:0x001222,
+    specular:0x00e5ff, shininess:120,
+    transparent:true, opacity:0.75,
+  });
+  const blob = new THREE.Mesh(geo, mat);
+  scene.add(blob);
+
+  // Wireframe
+  const wireMat = new THREE.MeshBasicMaterial({
+    color:0x00e5ff, wireframe:true,
+    transparent:true, opacity:0.08,
+  });
+  const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.62,7), wireMat);
+  scene.add(wire);
+
+  // Outer glow shell
+  const glowMat = new THREE.MeshBasicMaterial({
+    color:0x00e5ff, transparent:true, opacity:0.04, side:THREE.BackSide,
+  });
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(2.2,32,32), glowMat);
+  scene.add(glow);
+
+  // Data beads orbiting
+  const beadData = [
+    {r:2.8,sp:0.6,ph:0,ax:'xz',col:0x00ffb3,size:0.07},
+    {r:3.2,sp:0.35,ph:2.1,ax:'yz',col:0x00e5ff,size:0.05},
+    {r:2.6,sp:0.8,ph:4.2,ax:'xy',col:0xa259ff,size:0.06},
+    {r:3.5,sp:0.25,ph:1.0,ax:'xz',col:0xff6b35,size:0.04},
+  ];
+  const beads = beadData.map(b=>{
+    const g=new THREE.SphereGeometry(b.size,16,16);
+    const m=new THREE.MeshBasicMaterial({color:b.col});
+    const mesh=new THREE.Mesh(g,m);
+    // Glow trail
+    const tg=new THREE.SphereGeometry(b.size*2.5,8,8);
+    const tm=new THREE.MeshBasicMaterial({color:b.col,transparent:true,opacity:0.08});
+    const trail=new THREE.Mesh(tg,tm);
+    mesh.add(trail);
+    scene.add(mesh);
+    return{mesh,...b};
+  });
+
+  // Neural particle network
+  const pCount=180;
+  const pPos=new Float32Array(pCount*3);
+  const pVel=new Float32Array(pCount*3);
+  for(let i=0;i<pCount;i++){
+    const theta=Math.random()*Math.PI*2;
+    const phi=Math.acos(2*Math.random()-1);
+    const r=3+Math.random()*4;
+    pPos[i*3]=r*Math.sin(phi)*Math.cos(theta);
+    pPos[i*3+1]=r*Math.sin(phi)*Math.sin(theta);
+    pPos[i*3+2]=r*Math.cos(phi);
+    pVel[i*3]=(Math.random()-0.5)*0.002;
+    pVel[i*3+1]=(Math.random()-0.5)*0.002;
+    pVel[i*3+2]=(Math.random()-0.5)*0.002;
+  }
+  const pGeo=new THREE.BufferGeometry();
+  pGeo.setAttribute('position',new THREE.BufferAttribute(pPos.slice(),3));
+  const pMat=new THREE.PointsMaterial({color:0x00e5ff,size:0.04,transparent:true,opacity:0.5});
+  const pts=new THREE.Points(pGeo,pMat);
+  scene.add(pts);
+
+  // Neural lines - precompute close pairs
+  const linePairs=[];
+  for(let i=0;i<pCount;i++){
+    for(let j=i+1;j<pCount;j++){
+      const dx=pPos[i*3]-pPos[j*3];
+      const dy=pPos[i*3+1]-pPos[j*3+1];
+      const dz=pPos[i*3+2]-pPos[j*3+2];
+      if(Math.sqrt(dx*dx+dy*dy+dz*dz)<2.5) linePairs.push(i,j);
+    }
+  }
+  const lineVerts=new Float32Array(linePairs.length*3);
+  const lGeo=new THREE.BufferGeometry();
+  lGeo.setAttribute('position',new THREE.BufferAttribute(lineVerts,3));
+  const lMat=new THREE.LineBasicMaterial({color:0x6633aa,transparent:true,opacity:0.12});
+  scene.add(new THREE.LineSegments(lGeo,lMat));
+
+  // Mouse parallax
+  let targetX=0,targetY=0;
+  document.addEventListener('mousemove',e=>{
+    targetX=(e.clientX/window.innerWidth-0.5)*0.8;
+    targetY=(e.clientY/window.innerHeight-0.5)*0.5;
+  });
+
+  let t=0;
+  function animate(){
+    requestAnimationFrame(animate);
+    t+=0.01;
+
+    // Morph blob
+    const pos=geo.attributes.position;
+    for(let i=0;i<pos.count;i++){
+      const ox=basePts[i*3],oy=basePts[i*3+1],oz=basePts[i*3+2];
+      const len=Math.sqrt(ox*ox+oy*oy+oz*oz);
+      const nx=ox/len,ny=oy/len,nz=oz/len;
+      const w1=Math.sin(t*0.7+nx*3.1+ny*2.3)*0.20;
+      const w2=Math.cos(t*1.0+ny*4.0+nz*1.7)*0.15;
+      const w3=Math.sin(t*0.5+nz*2.7+nx*3.3)*0.12;
+      const w4=Math.cos(t*1.3+nx*1.5+nz*4.1)*0.08;
+      const d=1+w1+w2+w3+w4;
+      pos.setXYZ(i,nx*d*1.6,ny*d*1.6,nz*d*1.6);
+    }
+    pos.needsUpdate=true;
+    geo.computeVertexNormals();
+
+    // Rotate
+    blob.rotation.y+=0.004;
+    blob.rotation.x+=0.001;
+    wire.rotation.y=blob.rotation.y+0.01*t;
+    wire.rotation.x=blob.rotation.x;
+    glow.rotation.y-=0.002;
+
+    // Parallax
+    blob.rotation.y+=targetX*0.01;
+    camera.position.x+=(targetX*0.5-camera.position.x)*0.05;
+    camera.position.y+=(-targetY*0.5-camera.position.y)*0.05;
+    camera.lookAt(scene.position);
+
+    // Beads
+    beads.forEach(b=>{
+      const a=t*b.sp+b.ph;
+      if(b.ax==='xz'){
+        b.mesh.position.x=Math.cos(a)*b.r;
+        b.mesh.position.z=Math.sin(a)*b.r;
+        b.mesh.position.y=Math.sin(t*0.4+b.ph)*0.6;
+      }else if(b.ax==='yz'){
+        b.mesh.position.y=Math.cos(a)*b.r;
+        b.mesh.position.z=Math.sin(a)*b.r;
+        b.mesh.position.x=Math.sin(t*0.3+b.ph)*0.6;
+      }else{
+        b.mesh.position.x=Math.cos(a)*b.r;
+        b.mesh.position.y=Math.sin(a)*b.r;
+        b.mesh.position.z=Math.sin(t*0.25+b.ph)*0.6;
+      }
+    });
+
+    // Update particle positions
+    const curPos=pGeo.attributes.position.array;
+    for(let i=0;i<pCount;i++){
+      curPos[i*3]+=pVel[i*3];
+      curPos[i*3+1]+=pVel[i*3+1];
+      curPos[i*3+2]+=pVel[i*3+2];
+      // Contain in sphere
+      const px=curPos[i*3],py=curPos[i*3+1],pz=curPos[i*3+2];
+      const pr=Math.sqrt(px*px+py*py+pz*pz);
+      if(pr>7||pr<3){pVel[i*3]*=-1;pVel[i*3+1]*=-1;pVel[i*3+2]*=-1;}
+    }
+    pGeo.attributes.position.needsUpdate=true;
+
+    // Update line segments
+    for(let k=0;k<linePairs.length;k+=2){
+      const a=linePairs[k],b2=linePairs[k+1];
+      const lIdx=k*3;
+      lineVerts[lIdx]=curPos[a*3];lineVerts[lIdx+1]=curPos[a*3+1];lineVerts[lIdx+2]=curPos[a*3+2];
+      lineVerts[lIdx+3]=curPos[b2*3];lineVerts[lIdx+4]=curPos[b2*3+1];lineVerts[lIdx+5]=curPos[b2*3+2];
+    }
+    lGeo.attributes.position.needsUpdate=true;
+
+    // Pulse lights
+    cL.position.x=Math.sin(t*0.4)*4;
+    cL.position.y=Math.cos(t*0.3)*3;
+    vL.position.x=Math.cos(t*0.35)*4;
+    vL.position.y=Math.sin(t*0.5)*3;
+    cL.intensity=3+Math.sin(t*2)*1;
+    vL.intensity=3+Math.cos(t*1.5)*1;
+
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  window.addEventListener('resize',()=>{
+    const W2=canvas.clientWidth,H2=canvas.clientHeight;
+    camera.aspect=W2/H2;camera.updateProjectionMatrix();
+    renderer.setSize(W2,H2);
+  });
+})();
+
+// ─── FLUID CANVAS (Architecture section) ───
+(function(){
+  const canvas=document.getElementById('fluid-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  function resize(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;}
+  resize();
+  window.addEventListener('resize',resize);
+
+  const blobs=Array.from({length:6},(_,i)=>({
+    x:canvas.width*(0.15+i*0.14),
+    y:canvas.height*0.5+Math.sin(i)*30,
+    r:35+i*8,
+    vx:(Math.random()-0.5)*0.8,
+    vy:(Math.random()-0.5)*0.5,
+    hue:180+i*25,
+    phase:Math.random()*Math.PI*2,
+  }));
+
+  let ft=0;
+  function drawFluid(){
+    requestAnimationFrame(drawFluid);
+    ft+=0.015;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Background grid
+    ctx.strokeStyle='rgba(0,229,255,0.04)';
+    ctx.lineWidth=1;
+    for(let x=0;x<canvas.width;x+=40){
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();
+    }
+    for(let y=0;y<canvas.height;y+=40){
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();
+    }
+
+    // Move blobs
+    blobs.forEach(b=>{
+      b.x+=b.vx;b.y+=b.vy;
+      b.y+=Math.sin(ft*0.8+b.phase)*0.5;
+      if(b.x<b.r||b.x>canvas.width-b.r)b.vx*=-1;
+      if(b.y<b.r||b.y>canvas.height-b.r)b.vy*=-1;
+    });
+
+    // Draw metaball-like blobs with glow
+    blobs.forEach(b=>{
+      const grad=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r*2);
+      grad.addColorStop(0,`hsla(${b.hue},100%,60%,0.25)`);
+      grad.addColorStop(0.5,`hsla(${b.hue},100%,60%,0.08)`);
+      grad.addColorStop(1,'transparent');
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.r*2,0,Math.PI*2);
+      ctx.fillStyle=grad;ctx.fill();
+
+      // Core
+      const core=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+      core.addColorStop(0,`hsla(${b.hue},100%,75%,0.6)`);
+      core.addColorStop(1,`hsla(${b.hue},100%,50%,0)`);
+      ctx.beginPath();
+      // Wobbly circle
+      ctx.save();
+      ctx.translate(b.x,b.y);
+      ctx.beginPath();
+      for(let a=0;a<Math.PI*2;a+=0.1){
+        const wobble=b.r+Math.sin(a*4+ft*2+b.phase)*5+Math.cos(a*3+ft)*3;
+        const px=Math.cos(a)*wobble;
+        const py=Math.sin(a)*wobble;
+        a<0.1?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+      ctx.fillStyle=core;ctx.fill();
+      ctx.restore();
+    });
+
+    // Connection lines between nearby blobs
+    for(let i=0;i<blobs.length;i++){
+      for(let j=i+1;j<blobs.length;j++){
+        const b1=blobs[i],b2=blobs[j];
+        const dx=b2.x-b1.x,dy=b2.y-b1.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<200){
+          const alpha=(1-dist/200)*0.25;
+          ctx.beginPath();
+          ctx.moveTo(b1.x,b1.y);
+          // Curved line
+          const mx=(b1.x+b2.x)/2+Math.sin(ft)*20;
+          const my=(b1.y+b2.y)/2+Math.cos(ft)*15;
+          ctx.quadraticCurveTo(mx,my,b2.x,b2.y);
+          ctx.strokeStyle=`rgba(0,229,255,${alpha})`;
+          ctx.lineWidth=1;ctx.stroke();
+        }
+      }
+    }
+
+    // Labels
+    ctx.font='10px "Share Tech Mono"';
+    ctx.fillStyle='rgba(0,229,255,0.5)';
+    ctx.fillText('SMART VISCOSITY SIMULATION // FLUID DYNAMICS ENGINE',24,24);
+    ctx.fillStyle='rgba(162,89,255,0.5)';
+    ctx.fillText('ENVIRONMENTAL ADHERENCE ACTIVE',24,canvas.height-16);
+  }
+  drawFluid();
+})();
+
+// ─── VISCOSITY BARS ANIMATION ───
+document.querySelectorAll('.visc-bar').forEach(bar=>{
+  const targetW=bar.style.getPropertyValue('--w')||bar.getAttribute('style').match(/--w:([\d.]+%)/)?.[1]||'50%';
+  bar.style.width='0';
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        setTimeout(()=>{bar.style.width=targetW;bar.style.transition='width 1.5s ease';},200);
+        obs.disconnect();
+      }
+    });
+  },{threshold:0.3});
+  obs.observe(bar);
+});
+
+// ─── SCROLL REVEAL ───
+const revealConfig=[
+  ['.reveal-tag','section-tag','visible',0],
+  ['.reveal-heading','section-heading','visible',50],
+  ['.reveal-card','fluid-card','visible',100],
+  ['.reveal-table','compare-table','visible',150],
+  ['.reveal-arch','arch-item','visible',80],
+  ['.reveal-code','code-wrap','visible',200],
+  ['.reveal-resp','resp-card','visible',100],
+  ['.reveal-friction','friction-card','visible',80],
+  ['.reveal-p',null,null,100],
+];
+
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const el=e.target;
+      el.classList.add('visible');
+      if(el.classList.contains('reveal-p')){
+        el.style.opacity='1';el.style.transform='none';
+      }
+      observer.unobserve(el);
+    }
+  });
+},{threshold:0.15});
+
+document.querySelectorAll('.section-tag').forEach(el=>observer.observe(el));
+document.querySelectorAll('.section-heading').forEach(el=>observer.observe(el));
+document.querySelectorAll('.fluid-card,.arch-item,.resp-card,.friction-card').forEach(el=>observer.observe(el));
+document.querySelectorAll('.compare-table').forEach(el=>observer.observe(el));
+document.querySelectorAll('.code-wrap').forEach(el=>observer.observe(el));
+
+// Reveal paragraphs
+document.querySelectorAll('.reveal-p').forEach(el=>{
+  el.style.opacity='0';el.style.transform='translateY(16px)';
+  el.style.transition='all 0.7s ease';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>
